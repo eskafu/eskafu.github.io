@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G-OS</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111;
+    --border: #222;
+    --text: #b0b0b0;
+    --dim: #555;
+    --amber: #c88a2e;
+    --accent: #3b7fd4;
+  }
+  * { margin:0; padding:0; box-sizing:border-box }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  #login-overlay {
+    position: fixed; inset:0; z-index:9999;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #login-overlay.hidden { display: none }
+  .login-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2.5rem 2rem;
+    width: 340px; max-width: 90vw; text-align: center;
+  }
+  .login-box h1 {
+    font-weight: 300; font-size: 1.4rem; color:#e0e0e0; margin-bottom:.2rem;
+    letter-spacing: .04em;
+  }
+  .login-box h1 span { color: var(--amber); font-weight: 500 }
+  .login-box .sub { font-size:.75rem; color:var(--dim); margin-bottom:1.5rem }
+  .login-box input[type=password] {
+    width:100%; padding:.65rem .9rem;
+    background: #0a0a0a; border:1px solid var(--border); border-radius:5px;
+    color: #e0e0e0; font-size: 1rem; outline:none; text-align: center;
+    letter-spacing: .08em;
+  }
+  .login-box input:focus { border-color: var(--amber) }
+  .login-box .error { color: #b44; font-size: .75rem; margin-top:.5rem; min-height:1.2em }
+
+  #main-content.hidden { display: none }
+  .app { max-width: 800px; margin:0 auto; padding:3rem 1.5rem }
+  header {
+    text-align: center; margin-bottom: 3rem;
+    border-bottom: 1px solid var(--border); padding-bottom: 2rem;
+  }
+  header h2 {
+    font-weight: 200; font-size: 1.8rem; letter-spacing: .06em; color:#e0e0e0;
+  }
+  header h2 span { color: var(--amber) }
+  header p { color: var(--dim); margin-top:.5rem; font-size:.85rem }
+  .project-list { display: flex; flex-direction: column; gap: 1rem }
+  .project-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1.3rem 1.5rem;
+    display: flex; justify-content: space-between; align-items: center;
+    text-decoration: none; color: inherit;
+    transition: border-color .2s;
+  }
+  .project-card:hover { border-color: var(--amber) }
+  .project-card h3 { font-weight: 500; font-size: 1.05rem; color:#d0d0d0 }
+  .project-card .desc { font-size: .78rem; color: var(--dim); margin-top:.2rem }
+  .project-card .arrow { color: var(--dim); font-size: 1.2rem }
+  .empty { text-align: center; color: var(--dim); padding: 3rem; font-style: italic }
+  footer { text-align: center; color: #2a2a2a; font-size:.7rem; margin-top:3rem }
+</style>
+</head>
+<body>
+
+<div id="login-overlay">
+  <div class="login-box">
+    <h1>G-<span>PLAN</span></h1>
+    <div class="sub">Acesso restrito</div>
+    <input type="password" id="pw" placeholder="Password" autofocus>
+    <div class="error" id="err"></div>
+  </div>
+</div>
+
+<div id="main-content" class="hidden">
+  <div class="app">
+    <header>
+      <h2>G-<span>OS</span></h2>
+      <p>Hub · projetos · ferramentas</p>
+    </header>
+    <div class="project-list" id="projects">
+      <div class="empty">Nenhum projeto ainda</div>
+    </div>
+    <footer>G-OS · <span id="ts"></span></footer>
+  </div>
+</div>
+
+<script>
+  const HASH = 'f5ea8328fe243c4688128d48b0616e6eb756ed5afb4f27494402f649c0115773';
+  const PROJECTS = [
+    { name: 'g-plan', desc: 'Produção · datasheets · assistência de direção', path: '../g-plan/' },
+    { name: 'Pop Box Customiser', desc: '🎨 Cria caixas Funko Pop personalizadas · upload, crop, cores, download', path: '../pop-box/' },
+    { name: 'Zombie FPS', desc: '🧟 Jogo de sobrevivência · first-person shooter · zombies no browser', path: '../zombie-fps/' },
+  ];
+
+  async function sha256(m) {
+    const e = new TextEncoder().encode(m);
+    const h = await crypto.subtle.digest('SHA-256', e);
+    return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  const overlay = document.getElementById('login-overlay');
+  const main = document.getElementById('main-content');
+  const pw = document.getElementById('pw');
+  const err = document.getElementById('err');
+
+  if (sessionStorage.getItem('auth-g') === '1') unlock();
+
+  pw.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return;
+    if (await sha256(pw.value) === HASH) {
+      sessionStorage.setItem('auth-g', '1');
+      unlock();
+    } else { err.textContent = 'Password incorreta'; pw.value = ''; }
+  });
+
+  function unlock() {
+    overlay.classList.add('hidden');
+    main.classList.remove('hidden');
+    document.getElementById('ts').textContent = new Date().toISOString().slice(0,10);
+    const list = document.getElementById('projects');
+    if (PROJECTS.length) {
+      list.innerHTML = PROJECTS.map(p =>
+        `<a class="project-card" href="${p.path}">
+          <div><h3>${p.name}</h3><div class="desc">${p.desc}</div></div>
+          <div class="arrow">→</div></a>`
+      ).join('');
+    }
+  }
+</script>
+</body>
+</html>
